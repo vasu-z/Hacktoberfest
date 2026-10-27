@@ -69,6 +69,7 @@ class VisionModelClient:
         prompt: str,
         image_bytes: bytes,
         mime_type: str,
+        config: Optional[types.GenerateContentConfig] = None,
     ) -> str:
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty or blank")
@@ -82,10 +83,15 @@ class VisionModelClient:
         image_part = types.Part.from_bytes(data=image_bytes, mime_type=mime_type.strip())
         contents = [prompt.strip(), image_part]
 
+        kwargs = {}
+        if config is not None:
+            kwargs["config"] = config
+
         try:
             response = await client.aio.models.generate_content(
                 model=self.model,
                 contents=contents,
+                **kwargs,
             )
         except Exception as e:
             raise VisionModelError(f"Model vision generation request failed: {type(e).__name__}") from e

@@ -1,6 +1,11 @@
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
+from google.genai import types
 from pydantic import BaseModel
 
+from backend.services.image_processor import (
+    ImageProcessingError,
+    preprocess_image_for_text_reading,
+)
 from backend.services.vision_model import (
     VisionModelClient,
     VisionModelConfigurationError,
@@ -34,14 +39,32 @@ DEFAULT_QUESTION = (
 )
 
 READ_TEXT_PROMPT = (
-    "Transcribe all visible text in this image as accurately as possible. "
-    "Preserve the original language, spelling, punctuation, and reading order where practical. "
-    "Include multiple clearly readable text regions when relevant. "
-    "Do not translate, summarize, or interpret the text. "
-    "Indicate when text is unreadable or uncertain rather than inventing words. "
-    "Return only the transcription text, not bounding boxes, invented JSON, or object descriptions. "
-    "If no readable text is visible in the image, state that no readable text was detected."
+    "Transcribe all visible text, handwritten notes, mathematical expressions, and symbols in this image faithfully without summarizing or interpreting.\n"
+    "- Preserve the original language, spelling, punctuation, capitalization, and natural reading order.\n"
+    "- Faithfully transcribe mathematical symbols, equations, formulas, superscripts, subscripts, and matrix notation.\n"
+    "- Never silently correct, complete, or alter the author's writing.\n"
+    "- Mark illegible or uncertain words and symbols as [unclear] rather than guessing.\n"
+    "- Do not invent headings, commentary, or repeating duplicate text not present in the image.\n"
+    "- Provide a clear transcription suitable for reading aloud to a visually impaired user.\n"
+    "- If no readable text or symbols are visible in the image, state that no readable text was detected."
 )
+
+VALID_MODES = {"fast", "balanced", "accurate"}
+
+MODE_CONFIGS: dict[str, types.GenerateContentConfig] = {
+    "fast": types.GenerateContentConfig(
+        temperature=0.1,
+        max_output_tokens=512,
+    ),
+    "balanced": types.GenerateContentConfig(
+        temperature=0.1,
+        max_output_tokens=2048,
+    ),
+    "accurate": types.GenerateContentConfig(
+        temperature=0.0,
+        max_output_tokens=4096,
+    ),
+}
 
 
 class DescribeResponse(BaseModel):
@@ -99,12 +122,14 @@ async def _generate_vision_content(
     prompt: str,
     image_bytes: bytes,
     mime_type: str,
+    config: types.GenerateContentConfig | None = None,
 ) -> str:
     try:
         return await client.generate_vision(
             prompt=prompt,
             image_bytes=image_bytes,
             mime_type=mime_type,
+            config=config,
         )
     except VisionModelConfigurationError as exc:
         raise HTTPException(
@@ -142,8 +167,36 @@ async def describe_scene(
 @router.post("/read-text", response_model=ReadTextResponse)
 async def read_text(
     image: UploadFile = File(...),
+    mode: str = Form(default="balanced"),
     client: VisionModelClient = Depends(get_vision_client),
 ) -> ReadTextResponse:
-    image_bytes, mime_type = await _validate_and_read_image(image)
-    text = await _generate_vision_content(client, READ_TEXT_PROMPT, image_bytes, mime_type)
+    normalized_mode = (mode or "balanced").strip().lower()
+    if normalized_mode not in VALID_MODES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid mode '{mode}'. Supported modes: fast, balanced, accurate.",
+        )
+
+    raw_bytes, raw_mime = await _validate_and_read_image(image)
+
+    try:
+        processed_bytes, mime_type = preprocess_image_for_text_reading(
+            image_bytes=raw_bytes,
+            mime_type=raw_mime,
+            mode=normalized_mode,
+        )
+    except ImageProcessingError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="Image content is corrupted or unreadable.",
+        ) from exc
+
+    gen_config = MODE_CONFIGS[normalized_mode]
+    text = await _generate_vision_content(
+        client=client,
+        prompt=READ_TEXT_PROMPT,
+        image_bytes=processed_bytes,
+        mime_type=mime_type,
+        config=gen_config,
+    )
     return ReadTextResponse(text=text)
