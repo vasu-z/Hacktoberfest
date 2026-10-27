@@ -1,13 +1,22 @@
 import re
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from pydantic import BaseModel, Field
 
 from backend.routers.memory import get_memory_service
 from backend.routers.tasks import run_task_guidance
 from backend.routers.vision import get_vision_client
 from backend.services.spatial_memory import SpatialMemoryService
+from backend.services.speech import (
+    MAX_TEXT_LENGTH,
+    SpeechConfigurationError,
+    SpeechEmptyResponseError,
+    SpeechRateLimitError,
+    SpeechService,
+    SpeechServiceError,
+    SpeechTimeoutError,
+)
 from backend.services.vision_model import (
     VisionModelClient,
     VisionModelConfigurationError,
@@ -393,4 +402,67 @@ async def ask_assistant(
         action_required=False,
         required_input=None,
         cautions=["General AI responses should not be relied upon for safety-critical navigation or medical decisions."],
+    )
+
+
+class SpeakRequest(BaseModel):
+    text: str
+
+
+def get_speech_service() -> SpeechService:
+    return SpeechService()
+
+
+@router.post("/speak")
+async def speak_text(
+    request: SpeakRequest,
+    service: SpeechService = Depends(get_speech_service),
+) -> Response:
+    clean_text = request.text.strip() if request.text else ""
+    if not clean_text:
+        raise HTTPException(
+            status_code=422,
+            detail="text cannot be empty or blank.",
+        )
+    if len(clean_text) > MAX_TEXT_LENGTH:
+        raise HTTPException(
+            status_code=422,
+            detail=f"text exceeds maximum allowed length of {MAX_TEXT_LENGTH} characters.",
+        )
+
+    try:
+        audio_bytes, mime_type = await service.generate_speech(text=clean_text)
+    except SpeechConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AI credentials are not configured. Contact the server administrator.",
+        ) from exc
+    except SpeechRateLimitError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="The speech generation rate limit was exceeded. Please try again shortly.",
+        ) from exc
+    except SpeechTimeoutError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+            detail="The speech generation request timed out. Please try again.",
+        ) from exc
+    except SpeechEmptyResponseError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The AI speech model returned an empty response. Please try again.",
+        ) from exc
+    except SpeechServiceError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail="The AI speech model could not process the request. Please try again.",
+        ) from exc
+
+    return Response(
+        content=audio_bytes,
+        media_type=mime_type,
+        headers={
+            "Content-Disposition": "inline",
+            "Cache-Control": "no-cache",
+        },
     )

@@ -20,6 +20,7 @@ def test_default_settings():
     assert settings.gemini_api_key is None
     assert settings.gemini_model == "gemma-4-26b-a4b-it"
     assert settings.gemini_ocr_model == "gemini-3.5-flash-lite"
+    assert settings.gemini_tts_model == "gemini-3.8-flash-tts"
 
 
 def test_env_variable_overrides():
@@ -30,6 +31,7 @@ def test_env_variable_overrides():
         "GEMINI_API_KEY": "test-key-override",
         "GEMINI_MODEL": "custom-vision-model",
         "GEMINI_OCR_MODEL": "custom-ocr-model",
+        "GEMINI_TTS_MODEL": "custom-tts-model",
     }
     with patch.dict(os.environ, env_overrides, clear=False):
         settings = Settings(_env_file=None)
@@ -39,6 +41,7 @@ def test_env_variable_overrides():
         assert settings.gemini_api_key == "test-key-override"
         assert settings.gemini_model == "custom-vision-model"
         assert settings.gemini_ocr_model == "custom-ocr-model"
+        assert settings.gemini_tts_model == "custom-tts-model"
 
 
 def test_optional_api_key_and_secret_masking():
