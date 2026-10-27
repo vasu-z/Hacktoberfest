@@ -1,9 +1,11 @@
 from fastapi import FastAPI
 
+from backend.config import settings
+
 app = FastAPI(
     title="Saarthi Backend",
     description="Backend API for Saarthi - An AI Vision Companion",
-    version="0.1.0",
+    version=settings.saarthi_version,
 )
 
 
@@ -11,6 +13,6 @@ app = FastAPI(
 async def health_check():
     return {
         "status": "ok",
-        "service": "saarthi-backend",
-        "version": "0.1.0",
+        "service": settings.saarthi_service_name,
+        "version": settings.saarthi_version,
     }
