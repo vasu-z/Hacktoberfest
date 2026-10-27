@@ -4,3 +4,4 @@ httpx==0.28.1
 pytest
 pydantic-settings==2.15.0
 python-dotenv==1.2.3
+google-genai==2.32.0
