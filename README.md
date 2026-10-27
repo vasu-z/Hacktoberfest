@@ -1,4 +1,4 @@
-# Saarthi — An AI Vision Companion
+# Saarthi An AI Vision Companion
 
 **A little more independence. A little less uncertainty.**
 
@@ -10,7 +10,7 @@ Saarthi aims to make these everyday moments easier for blind and low-vision peop
 
 Much of the world communicates through sight. Labels, signs, objects, surroundings, and everyday activities often assume that a person can simply look and understand.
 
-For blind and low-vision people, accessing this information can mean relying on someone else, using multiple tools, or navigating uncertainty. Assistive technology should do more than describe an image — it should help people make sense of what is around them.
+For blind and low-vision people, accessing this information can mean relying on someone else, using multiple tools, or navigating uncertainty. Assistive technology should do more than describe an image it should help people make sense of what is around them.
 
 **Our Approach**
 
