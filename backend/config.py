@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     gemini_api_key: Optional[str] = None
     gemini_model: str = "gemma-4-26b-a4b-it"
     gemini_ocr_model: str = "gemini-3.5-flash-lite"
+    saarthi_database_path: str = str(BASE_DIR / "data" / "saarthi.db")
 
     model_config = SettingsConfigDict(
         env_file=(BASE_DIR / ".env", ".env"),

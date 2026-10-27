@@ -44,17 +44,27 @@ class VisionModelClient:
         self._client = genai.Client(api_key=api_key)
         return self._client
 
-    async def generate_text(self, prompt: str, model: Optional[str] = None) -> str:
+    async def generate_text(
+        self,
+        prompt: str,
+        model: Optional[str] = None,
+        config: Optional[types.GenerateContentConfig] = None,
+    ) -> str:
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty or blank")
 
         client = self._get_client()
         target_model = model or self.model
 
+        kwargs = {}
+        if config is not None:
+            kwargs["config"] = config
+
         try:
             response = await client.aio.models.generate_content(
                 model=target_model,
                 contents=prompt.strip(),
+                **kwargs,
             )
         except Exception as e:
             raise VisionModelError(f"Model generation request failed: {type(e).__name__}") from e

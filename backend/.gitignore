@@ -17,3 +17,9 @@ venv/
 .coverage
 .coverage.*
 htmlcov/
+ 
+# Database files and local storage
+data/
+*.db
+*.sqlite
+*.sqlite3
