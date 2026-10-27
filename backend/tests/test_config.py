@@ -19,6 +19,7 @@ def test_default_settings():
     assert settings.saarthi_env == "development"
     assert settings.gemini_api_key is None
     assert settings.gemini_model == "gemma-4-26b-a4b-it"
+    assert settings.gemini_ocr_model == "gemini-3.5-flash-lite"
 
 
 def test_env_variable_overrides():
@@ -28,6 +29,7 @@ def test_env_variable_overrides():
         "SAARTHI_ENV": "staging",
         "GEMINI_API_KEY": "test-key-override",
         "GEMINI_MODEL": "custom-vision-model",
+        "GEMINI_OCR_MODEL": "custom-ocr-model",
     }
     with patch.dict(os.environ, env_overrides, clear=False):
         settings = Settings(_env_file=None)
@@ -36,6 +38,7 @@ def test_env_variable_overrides():
         assert settings.saarthi_env == "staging"
         assert settings.gemini_api_key == "test-key-override"
         assert settings.gemini_model == "custom-vision-model"
+        assert settings.gemini_ocr_model == "custom-ocr-model"
 
 
 def test_optional_api_key_and_secret_masking():

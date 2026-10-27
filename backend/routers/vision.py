@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from google.genai import types
 from pydantic import BaseModel
 
+from backend.config import settings
 from backend.services.image_processor import (
     ImageProcessingError,
     preprocess_image_for_text_reading,
@@ -123,6 +124,7 @@ async def _generate_vision_content(
     image_bytes: bytes,
     mime_type: str,
     config: types.GenerateContentConfig | None = None,
+    model: str | None = None,
 ) -> str:
     try:
         return await client.generate_vision(
@@ -130,6 +132,7 @@ async def _generate_vision_content(
             image_bytes=image_bytes,
             mime_type=mime_type,
             config=config,
+            model=model,
         )
     except VisionModelConfigurationError as exc:
         raise HTTPException(
@@ -198,5 +201,6 @@ async def read_text(
         image_bytes=processed_bytes,
         mime_type=mime_type,
         config=gen_config,
+        model=settings.gemini_ocr_model,
     )
     return ReadTextResponse(text=text)

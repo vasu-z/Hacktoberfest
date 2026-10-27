@@ -329,3 +329,48 @@ def test_scene_understanding_endpoint_still_works(http_client):
     )
     assert resp.status_code == 200
     assert resp.json() == {"description": "A well-lit hallway."}
+
+
+# ── 11. Model Selection (Flash-Lite for OCR vs Gemma for Scene) ───────────────
+
+def test_read_text_uses_flash_lite_by_default(http_client):
+    mock = make_mock_client("FLASHLITE TEXT")
+    override_client(mock)
+
+    resp = http_client.post(
+        "/api/v1/vision/read-text",
+        files={"image": ("sign.jpg", JPEG_IMAGE, "image/jpeg")},
+    )
+    assert resp.status_code == 200
+    call_kwargs = mock.generate_vision.call_args.kwargs
+    assert call_kwargs["model"] == "gemini-3.5-flash-lite"
+
+
+def test_read_text_respects_custom_ocr_model_override(http_client, monkeypatch):
+    from backend.config import settings
+
+    monkeypatch.setattr(settings, "gemini_ocr_model", "custom-ocr-v2")
+    mock = make_mock_client("CUSTOM MODEL TEXT")
+    override_client(mock)
+
+    resp = http_client.post(
+        "/api/v1/vision/read-text",
+        files={"image": ("sign.jpg", JPEG_IMAGE, "image/jpeg")},
+    )
+    assert resp.status_code == 200
+    call_kwargs = mock.generate_vision.call_args.kwargs
+    assert call_kwargs["model"] == "custom-ocr-v2"
+
+
+def test_scene_understanding_retains_default_gemma_model(http_client):
+    mock = MagicMock()
+    mock.generate_vision = AsyncMock(return_value="A living room.")
+    override_client(mock)
+
+    resp = http_client.post(
+        "/api/v1/vision/describe",
+        files={"image": ("photo.jpg", JPEG_IMAGE, "image/jpeg")},
+    )
+    assert resp.status_code == 200
+    call_kwargs = mock.generate_vision.call_args.kwargs
+    assert call_kwargs.get("model") is None

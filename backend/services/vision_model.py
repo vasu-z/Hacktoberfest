@@ -44,15 +44,16 @@ class VisionModelClient:
         self._client = genai.Client(api_key=api_key)
         return self._client
 
-    async def generate_text(self, prompt: str) -> str:
+    async def generate_text(self, prompt: str, model: Optional[str] = None) -> str:
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty or blank")
 
         client = self._get_client()
+        target_model = model or self.model
 
         try:
             response = await client.aio.models.generate_content(
-                model=self.model,
+                model=target_model,
                 contents=prompt.strip(),
             )
         except Exception as e:
@@ -70,6 +71,7 @@ class VisionModelClient:
         image_bytes: bytes,
         mime_type: str,
         config: Optional[types.GenerateContentConfig] = None,
+        model: Optional[str] = None,
     ) -> str:
         if not prompt or not prompt.strip():
             raise ValueError("Prompt cannot be empty or blank")
@@ -87,9 +89,11 @@ class VisionModelClient:
         if config is not None:
             kwargs["config"] = config
 
+        target_model = model or self.model
+
         try:
             response = await client.aio.models.generate_content(
-                model=self.model,
+                model=target_model,
                 contents=contents,
                 **kwargs,
             )

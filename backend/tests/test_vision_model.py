@@ -67,6 +67,23 @@ async def test_image_generation_success(mock_sdk_client):
 
 
 @pytest.mark.anyio
+async def test_generate_vision_model_override(mock_sdk_client):
+    mock_response = MagicMock()
+    mock_response.text = "Model text."
+    mock_sdk_client.aio.models.generate_content.return_value = mock_response
+
+    client = VisionModelClient(client=mock_sdk_client, model="gemma-4-26b-a4b-it")
+    await client.generate_vision(
+        prompt="Read text",
+        image_bytes=b"fake_jpeg",
+        mime_type="image/jpeg",
+        model="gemini-3.5-flash-lite",
+    )
+    call_args = mock_sdk_client.aio.models.generate_content.await_args
+    assert call_args.kwargs["model"] == "gemini-3.5-flash-lite"
+
+
+@pytest.mark.anyio
 async def test_missing_api_key_raises_configuration_error():
     with patch("backend.services.vision_model.settings", Settings(_env_file=None, gemini_api_key=None)):
         client = VisionModelClient()
