@@ -114,13 +114,13 @@ def _parse_and_validate_guidance(raw_text: str, task: str) -> TaskGuidanceRespon
     )
 
 
-@router.post("/guide", response_model=TaskGuidanceResponse)
-async def guide_task(
-    task: str = Form(...),
-    context: Optional[str] = Form(default=None),
-    previous_steps: Optional[str] = Form(default=None),
-    image: Optional[UploadFile] = File(default=None),
-    client: VisionModelClient = Depends(get_vision_client),
+async def run_task_guidance(
+    client: VisionModelClient,
+    task: str,
+    context: Optional[str] = None,
+    previous_steps: Optional[str] = None,
+    image_bytes: Optional[bytes] = None,
+    mime_type: Optional[str] = None,
 ) -> TaskGuidanceResponse:
     clean_task = task.strip() if task else ""
     if not clean_task:
@@ -140,12 +140,8 @@ async def guide_task(
 
     full_prompt = "\n\n".join(prompt_sections)
 
-    # Process image if provided and non-empty
-    has_image = image is not None and bool(image.filename and image.filename.strip())
-
     try:
-        if has_image:
-            image_bytes, mime_type = await _validate_and_read_image(image)
+        if image_bytes and mime_type:
             raw_response = await client.generate_vision(
                 prompt=full_prompt,
                 image_bytes=image_bytes,
@@ -174,3 +170,35 @@ async def guide_task(
         ) from exc
 
     return _parse_and_validate_guidance(raw_response, clean_task)
+
+
+@router.post("/guide", response_model=TaskGuidanceResponse)
+async def guide_task(
+    task: str = Form(...),
+    context: Optional[str] = Form(default=None),
+    previous_steps: Optional[str] = Form(default=None),
+    image: Optional[UploadFile] = File(default=None),
+    client: VisionModelClient = Depends(get_vision_client),
+) -> TaskGuidanceResponse:
+    clean_task = task.strip() if task else ""
+    if not clean_task:
+        raise HTTPException(
+            status_code=422,
+            detail="task cannot be empty or blank.",
+        )
+
+    # Process image if provided and non-empty
+    has_image = image is not None and bool(image.filename and image.filename.strip())
+    image_bytes = None
+    mime_type = None
+    if has_image:
+        image_bytes, mime_type = await _validate_and_read_image(image)
+
+    return await run_task_guidance(
+        client=client,
+        task=clean_task,
+        context=context,
+        previous_steps=previous_steps,
+        image_bytes=image_bytes,
+        mime_type=mime_type,
+    )
